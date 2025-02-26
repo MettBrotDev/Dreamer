@@ -1,0 +1,83 @@
+import torch
+import torch.nn as nn
+import numpy as np
+import hockey.hockey_env as h_env
+import config
+import DreamingNets  # Assumes your BinaryAutoencoder is defined here
+import os
+
+# Set device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+torch.set_default_dtype(torch.float32)
+torch.set_default_device(device)
+print("Device:", device)
+
+# Define a simple autoencoder evaluation function
+def evaluate_autoencoder(model, observations, num_samples=5):
+    """
+    For a given autoencoder model and a batch of observations,
+    prints out the original and the reconstructed observations.
+    """
+    model.eval()  # Set model to evaluation mode
+    with torch.no_grad():
+        # Pass observations through the encoder and decoder
+        observations /= 5
+        internal_rep, reconstructions = model.forward(observations)
+    
+    for _ in range(10):
+        i = np.random.randint(0, len(observations))
+        orig = observations[i].cpu().numpy() * 5
+        recon = reconstructions[i].cpu().numpy() * 5
+        print(f"Sample {i}:")
+        print("Original:", orig)
+        print("Reconstructed:", recon)
+        print("Difference:", orig - recon)
+        print("-" * 40)
+
+def main():
+    # Load your autoencoder model (encoder and decoder)
+    # Assumes you have a class BinaryAutoencoder defined in DreamingNets
+    autoencoder = DreamingNets.BinaryAutoencoder().to(device)
+    
+    # Load saved state dict from file specified in config (or change the filename)
+    model_path = config.AE_FILE_NAME if hasattr(config, 'AE_FILE_NAME') else "models/autoencoder.pth"
+    if os.path.isfile(model_path):
+        state_dict = torch.load(model_path, map_location=device)
+        autoencoder.load_state_dict(state_dict)
+        print(f"Loaded autoencoder model from {model_path}")
+    else:
+        print("No saved model found at", model_path)
+        return
+
+    # Create a dummy environment to get some observations (or load your own dataset)
+    # For example, if your observations are 18-float vectors:
+    # Here we assume a gymnasium environment; replace with your environment if needed.
+    env = h_env.HockeyEnv()  # Replace with your hockey environment if available.
+    player1 = h_env.BasicOpponent(weak=False)
+    player2 = h_env.BasicOpponent(weak=True)
+    # Note: Your observations might need to be preprocessed.
+    obs, info = env.reset()
+    obs_agent2 = env.obs_agent_two()
+    # Convert observation to a tensor of appropriate shape: [obs_space]
+    # If your observation space is 18, ensure you have that dimension.
+    # Here, we'll assume obs is a NumPy array of length 18.
+    observations = []
+    for i in range(100):  # Collect 50 samples
+        obs_tensor = torch.tensor(obs, dtype=torch.float32, device=device)
+        observations.append(obs_tensor)
+        a1 = player2.act(obs)
+        a2 = player2.act(obs_agent2)
+        obs, reward, done, truncated, info = env.step(np.hstack([a1,a2]))
+        obs_agent2 = env.obs_agent_two()
+        if done or truncated:
+            obs, info = env.reset()
+    
+    observations = torch.stack(observations)  # Shape: [num_samples, obs_space]
+
+    # Evaluate the autoencoder on these observations
+    evaluate_autoencoder(autoencoder, observations, num_samples=5)
+    
+    env.close()
+
+if __name__ == '__main__':
+    main()
