@@ -11,6 +11,6 @@ Dreamer          -This is my code for the hockey environment, its missing some o
 
 ProjectTesting   -This is my very first dreamer test, where i was still using deterministic networks
 
-**Important:** My latest commit on the DreamerOnPendel does not have a fitting model, therefore the NetTesting file does not work.
+**Important:** My latest change on the DreamerOnPendel does not have a fitting model, therefore the NetTesting file does not work.
 
-If you want to see my networks performance you have to go one commit back (its called e, i have no idea why i called it like that, please ignore the name).
+Thats why i called this one hotfix, since you can not check performance on that one. The training seemed to work on that one but for running the NetTesting file please use the non hotfix file.
